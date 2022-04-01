@@ -57,21 +57,15 @@ public:
     float sum_phis, sum_phis2;
     int N_observations;
 
-    auto get_and_reset_observables()
+    void get_and_reset_observables(float *phi, float *sigma_phi, float *xi_phi)
     {
-        struct retVals
-        {
-            float f1, f2, f3;
-        };
-        float phi = sum_phis / (float(N) * float(N_observations));
-        float sigma_phi = sqrt(sum_phis2 / float(N_observations) - (sum_phis * sum_phis) / float(N_observations * N_observations)) / float(N);
-        float xi_phi = (sum_phis2 - (sum_phis * sum_phis) / float(N_observations)) / sum_phis;
+        *phi = sum_phis / (float(N) * float(N_observations));
+        *sigma_phi = sqrt(sum_phis2 / float(N_observations) - (sum_phis * sum_phis) / float(N_observations * N_observations)) / float(N);
+        *xi_phi = (sum_phis2 - (sum_phis * sum_phis) / float(N_observations)) / sum_phis;
 
         sum_phis2 = 0.0;
         sum_phis = 0.0;
         N_observations = 0;
-
-        return retVals{phi, sigma_phi, xi_phi};
     }
 
     vicsek_system(float rho_in, float v0_in, int L_in, int seed) : v0(v0_in),
@@ -94,7 +88,8 @@ public:
         sfmt_init_gen_rand(&sfmt, seed);
         randomize_system();
         set_geometry();
-        get_and_reset_observables();
+        float junk;
+        get_and_reset_observables(&junk, &junk, &junk);
     }
 
     ~vicsek_system()
@@ -305,6 +300,7 @@ int main()
 {
     float rho, v0;
     int L, N_reset, N_steps, seed;
+    float phi, sigma_phi, xi_phi;
 
     fstream myfile("input.dat");
     string line;
@@ -328,7 +324,7 @@ int main()
 
         system.integrate(N_steps, 1);
 
-        auto [phi, sigma_phi, xi_phi] = system.get_and_reset_observables();
+        system.get_and_reset_observables(&phi, &sigma_phi, &xi_phi);
 
         cout << system.eta << ',' << phi << ',' << sigma_phi << ',' << xi_phi << endl;
     }
