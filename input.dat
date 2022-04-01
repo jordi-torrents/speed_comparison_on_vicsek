@@ -1,0 +1,6 @@
+15 int_L
+0.03 v0
+1.0 rho
+10000 N_reset
+10000 N_steps
+1234 seed
