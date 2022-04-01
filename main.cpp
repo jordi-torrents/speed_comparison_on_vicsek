@@ -18,7 +18,6 @@ using namespace std;
 
 class vicsek_system
 {
-#define RAN (sfmt_genrand_real2(&sfmt))
 private:
     const float v0, inv_2L, th = 1.0, rand_const = (1.0 / 4294967296.0);
     // float *x, *y, *vx, *vy;
@@ -27,26 +26,26 @@ private:
     int *near_nbr_cells;
     sfmt_t sfmt;
 
-    const float pbc(float value)
+    inline const float pbc(float value)
     {
         return value - int(inv_2L * value) * L;
     }
 
-    const float dist_PBC(float x1, float y1, float x2, float y2)
+    inline const float dist_PBC(float x1, float y1, float x2, float y2)
     {
         float dx = pbc(x1 - x2);
         float dy = pbc(y1 - y2);
         return dx * dx + dy * dy;
     }
 
-    const float dist_simple(float x1, float y1, float x2, float y2)
+    inline const float dist_simple(float x1, float y1, float x2, float y2)
     {
         float dx = x1 - x2;
         float dy = y1 - y2;
         return dx * dx + dy * dy;
     }
 
-    const float wrap3(float value)
+    inline const float wrap3(float value)
     {
         return (value > 0 ? (value > L ? value - L : value) : value + L);
     }
@@ -68,11 +67,14 @@ public:
         N_observations = 0;
     }
 
-    vicsek_system(float rho_in, float v0_in, int L_in, int seed) : v0(v0_in),
-                                                                   L(L_in),
-                                                                   N_cells(L_in * L_in),
-                                                                   N(int(L_in * L_in * rho_in)),
-                                                                   inv_2L(2.0 / float(L_in))
+    vicsek_system(float rho_in,
+                  float v0_in,
+                  int L_in,
+                  int seed) : v0(v0_in),
+                              L(L_in),
+                              N_cells(L_in * L_in),
+                              N(int((L_in * L_in * rho_in + 2.0) / 4) * 4),
+                              inv_2L(2.0 / float(L_in))
     {
         // x = (float *)malloc(N * sizeof(float));
         // y = (float *)malloc(N * sizeof(float));
@@ -83,7 +85,7 @@ public:
         y.resize(N);
         vx.resize(N);
         vy.resize(N);
-
+        // cout << sfmt_get_min_array_size32(&sfmt) << endl;
         near_nbr_cells = (int *)malloc(N_cells * 4 * sizeof(int));
         sfmt_init_gen_rand(&sfmt, seed);
         randomize_system();
@@ -155,24 +157,31 @@ public:
 
     void randomize_system()
     {
-        // uint32_t random1[N];
-        // uint32_t random2[N];
-        // uint32_t random3[N];
-        // sfmt_fill_array32(&sfmt, random1, N);
-        // sfmt_fill_array32(&sfmt, random2, N);
-        // sfmt_fill_array32(&sfmt, random3, N);
 
+        int random_lenght = max(3 * N, sfmt_get_min_array_size32(&sfmt));
+
+        uint32_t random[random_lenght];
+
+        // uint32_t *random;
+        // if (posix_memalign((void **)&random, 16, sizeof(float) * random_lenght) != 0)
+        //     printf("can't allocate memory.\n");
+
+        sfmt_fill_array32(&sfmt, random, random_lenght);
+        float norm = 1.0 / 4294967296.0;
+        int rand_indx = 0;
         for (int i = 0; i < N; i++)
         {
-            x[i] = RAN * L;
-            y[i] = RAN * L;
-            float theta = RAN * 6.283185307;
+            x[i] = norm * random[rand_indx++] * L;
+            y[i] = norm * random[rand_indx++] * L;
+            float theta = norm * random[rand_indx++] * 6.283185307;
             vx[i] = cos(theta);
             vy[i] = sin(theta);
         }
+
+        // free(random);
     }
 
-    void neighbours_direction(float *nbr_direction)
+    void neighbours_direction(float *nbr_direction, uint32_t *random)
     {
 
         vector<float> integr_vx(vx), integr_vy(vy);
@@ -180,15 +189,15 @@ public:
 
         // copy(vx.begin(), vx.end(), integr_vx);
         // copy(vx.begin(), vx.end(), integr_vx);
-        fill(header.begin(), header.end(), -1);
+        // fill(header.begin(), header.end(), -1);
 
         for (int i = 0; i < N; i++)
         {
             int cell = int(x[i]) % L + L * (int(y[i]) % L);
             cell_list[i] = header[cell];
             header[cell] = i;
-            integr_vx[i] = vx[i];
-            integr_vy[i] = vy[i];
+            // integr_vx[i] = vx[i];
+            // integr_vy[i] = vy[i];
         }
 
         for (int cell = 0; cell < N_cells; cell++)
@@ -260,27 +269,30 @@ public:
         // {
         //     random[i] = RAN;
         // }
-        float factor1 = eta * 6.283185307179586;
-        float factor2 = -eta * 3.14159265359;
+        // float factor1 = eta * 6.283185307179586;
+        // float factor2 = -eta * 3.14159265359;
 
         // uint32_t random[N];
         // sfmt_fill_array32(&sfmt, random, N);
-        // float factor1 = eta * 6.283185307179586 / 4294967296.0;
-        // float factor2 = -eta * 3.14159265359;
-
+        float factor1 = eta * 6.283185307179586 / 4294967296.0;
+        float factor2 = -eta * 3.14159265359;
+        // cout << random[0] * (1 / 4294967296.0) << endl;
         for (int i = 0; i < N; i++)
         {
-            nbr_direction[i] = atan2(integr_vy[i], integr_vx[i]) + factor1 * RAN + factor2;
+            nbr_direction[i] = atan2(integr_vy[i], integr_vx[i]) + factor1 * random[i] + factor2;
         }
     }
 
     void integrate(int steps = 1, int update_obs = 0)
     {
         float particle_direction[N];
+        int random_lenght = max(steps * N, sfmt_get_min_array_size32(&sfmt));
+        uint32_t random[random_lenght];
 
+        sfmt_fill_array32(&sfmt, random, random_lenght);
         for (int step = 0; step < steps; step++)
         {
-            neighbours_direction(particle_direction);
+            neighbours_direction(particle_direction, &random[N * step]);
 
             for (int i = 0; i < N; i++)
             {
