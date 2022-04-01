@@ -2,9 +2,9 @@ TARGET_EXEC := prog.exe
 
 BUILD_DIR := ./build
 SRC_DIRS := ./src
-FTR_COMP := gfortran-10
-C++_COMP := g++-10
-FLAGS := -O3 -std=c++17
+FTR_COMP := gfortran
+C++_COMP := g++
+FLAGS := -O3
 C_RANDOM := SFMT-src-1.5.1/SFMT.c
 
 LANGUAGES = fortran cpp
