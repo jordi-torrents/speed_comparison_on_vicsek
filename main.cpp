@@ -72,7 +72,7 @@ public:
                                                                    L(L_in),
                                                                    N_cells(L_in * L_in),
                                                                    N(int(L_in * L_in * rho_in)),
-                                                                   inv_2L(2.0 / float(L))
+                                                                   inv_2L(2.0 / float(L_in))
     {
         // x = (float *)malloc(N * sizeof(float));
         // y = (float *)malloc(N * sizeof(float));
