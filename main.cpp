@@ -19,7 +19,8 @@ using namespace std;
 class vicsek_system
 {
 private:
-    const float v0, inv_2L, th = 1.0, rand_const = (1.0 / 4294967296.0);
+    float v0, inv_2L, th = 1.0, rand_const = (1.0 / 4294967296.0);
+    const int L, N_cells, N;
     // float *x, *y, *vx, *vy;
     vector<float> x, y;
     vector<float> vx, vy;
@@ -51,7 +52,6 @@ private:
     }
 
 public:
-    const int L, N_cells, N;
     float eta;
     float sum_phis, sum_phis2;
     int N_observations;
@@ -286,13 +286,13 @@ public:
     void integrate(int steps = 1, int update_obs = 0)
     {
         float particle_direction[N];
-        int random_lenght = max(steps * N, sfmt_get_min_array_size32(&sfmt));
+        int random_lenght = max(N, sfmt_get_min_array_size32(&sfmt));
         uint32_t random[random_lenght];
 
-        sfmt_fill_array32(&sfmt, random, random_lenght);
         for (int step = 0; step < steps; step++)
         {
-            neighbours_direction(particle_direction, &random[N * step]);
+            sfmt_fill_array32(&sfmt, random, random_lenght);
+            neighbours_direction(particle_direction, random);
 
             for (int i = 0; i < N; i++)
             {
