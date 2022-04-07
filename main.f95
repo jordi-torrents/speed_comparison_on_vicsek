@@ -1,8 +1,6 @@
 program levy_program
     use subroutines
 
-    real(8) :: polar, polar_i, polar2
-
     open(unit=645,file='input.dat')
     read(645,*) int_L
     read(645,*) v0
@@ -24,32 +22,23 @@ program levy_program
 
     eta = 0.d0
 
-    do iteration = 1, N_reset
-        call integrate()
-    end do
+
+    call integrate(N_reset, .false.)
 
     do int_eta = 0, 100, 5
         eta = dble(int_eta)/100.d0
 
-        do iteration = 1, N_reset
-            call integrate()
-        end do
+        call integrate(N_reset, .false.)
 
         polar = 0.0d0
         polar2 = 0.0d0
 
-        do iteration = 1, N_steps
-            call integrate()
-            polar_i = sqrt(sum(unitary_vel(:,1))**2+sum(unitary_vel(:,2))**2)
 
-            polar = polar + polar_i
-            polar2 = polar2 + polar_i*polar_i
-        end do
+        call integrate(N_steps, .true.)
 
-        ! polar = polar/dble(N_steps*N)
-        ! polar2 = polar2/dble(N_steps*N*N)
 
-        ! print*, eta,',', polar/(dble(N)*dble(N_steps)), ',',(polar2 - (polar * polar)/dble(N_steps))/polar
+
+
         print*, &
             eta,',', &
             polar/(dble(N)*dble(N_steps)), ',', &
