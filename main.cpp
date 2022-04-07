@@ -27,26 +27,26 @@ private:
     int *near_nbr_cells;
     sfmt_t sfmt;
 
-    inline const float pbc(float value)
+    inline float pbc(float value)
     {
         return value - int(inv_2L * value) * L;
     }
 
-    inline const float dist_PBC(float x1, float y1, float x2, float y2)
+    inline float dist_PBC(float x1, float y1, float x2, float y2)
     {
         float dx = pbc(x1 - x2);
         float dy = pbc(y1 - y2);
         return dx * dx + dy * dy;
     }
 
-    inline const float dist_simple(float x1, float y1, float x2, float y2)
+    inline float dist_simple(float x1, float y1, float x2, float y2)
     {
         float dx = x1 - x2;
         float dy = y1 - y2;
         return dx * dx + dy * dy;
     }
 
-    inline const float wrap3(float value)
+    inline float wrap3(float value)
     {
         return (value > 0 ? (value > L ? value - L : value) : value + L);
     }
