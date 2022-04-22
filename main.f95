@@ -1,7 +1,9 @@
 program levy_program
     use subroutines
+    character*100 :: arg
 
-    open(unit=645,file='input.dat')
+    call get_command_argument(1, arg)
+    open(unit=645, file=trim(arg), status='old')
     read(645,*) int_L
     read(645,*) v0
     read(645,*) rho
@@ -9,6 +11,15 @@ program levy_program
     read(645,*) N_steps
     read(645,*) seed
     close(645)
+
+    ! open(unit=645,file='input.dat')
+    ! read(645,*) int_L
+    ! read(645,*) v0
+    ! read(645,*) rho
+    ! read(645,*) N_reset
+    ! read(645,*) N_steps
+    ! read(645,*) seed
+    ! close(645)
 
     L=dble(int_L)
     N=nint(L*L*rho)
