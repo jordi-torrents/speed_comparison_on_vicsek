@@ -1,8 +1,9 @@
 import numba as nb
 import numpy as np
+import sys
 
-v0 = 0.03
-with open("input.dat", "r") as file:
+
+with open(sys.argv[1], "r") as file:
     L = int(file.readline().split()[0])
     v0 = float(file.readline().split()[0])
     rho = float(file.readline().split()[0])

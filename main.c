@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
     sfmt_init_gen_rand(&sfmt, 12345);
     // printf("%i %i\n", sfmt_get_min_array_size32(&sfmt), sfmt_get_min_array_size64(&sfmt));
 
-    FILE *in_file = fopen("input.dat", "r"); // read only
+    FILE *in_file = fopen(argv[1], "r"); // read only
     if (fscanf(in_file, "%d %*s\n%f %*s\n%f %*s\n%i %*s\n%i %*s\n%i %*s\n", &int_L, &v0, &rho, &N_reset, &N_steps, &seed) != 6)
         printf("ERROR on input!");
 

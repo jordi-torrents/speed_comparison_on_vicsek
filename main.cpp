@@ -318,13 +318,14 @@ public:
     }
 };
 
-int main()
+int main(int argc, char *argv[])
 {
     float rho, v0;
     int L, N_reset, N_steps, seed;
     float phi, sigma_phi, xi_phi;
 
-    fstream myfile("input.dat");
+    fstream myfile(argv[1]);
+    cout << argv[1] << endl;
     string line;
     myfile >> L >> line;
     myfile >> v0 >> line;
@@ -333,6 +334,11 @@ int main()
     myfile >> N_steps >> line;
     myfile >> seed >> line;
     myfile.close();
+
+    cout << L << endl;
+    cout << v0 << endl;
+    cout << rho << endl;
+    cout << N_steps << endl;
 
     vicsek_system system(rho, v0, L, seed);
 

@@ -4,16 +4,20 @@ BUILD_DIR := ./build
 SRC_DIRS := ./src
 FTR_COMP := gfortran
 C++_COMP := g++
+C_COMP := gcc
 FLAGS := -O3 -msse2 -DHAVE_SSE2
 C_RANDOM := SFMT-src-1.5.1/SFMT.c
 
-LANGUAGES = fortran cpp
+LANGUAGES = fortran cpp c
 
 all: $(LANGUAGES)
 $(LANGUAGES): %: %.exe
 # run_$(LANGUAGES): %: $(LANGUAGES).out
 run_cpp: cpp.out
 run_fortran: fortran.out
+
+c.exe: main.c
+	$(C_COMP) $(FLAGS) main.c $(C_RANDOM) -DSFMT_MEXP=19937 -o $@ -lm
 
 cpp.exe: main.cpp
 	$(C++_COMP) $(FLAGS) main.cpp $(C_RANDOM) -DSFMT_MEXP=19937 -o $@
