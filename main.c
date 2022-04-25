@@ -1,11 +1,6 @@
 #include <math.h>
 // #include <cstring>
 #include <string.h>
-// #include "mt19937-64.c"
-// #define RAN (genrand64_real2())
-
-// #include "mt19937ar.c"
-// #define RAN (genrand_real2())
 
 #include "SFMT-src-1.5.1/SFMT.h"
 sfmt_t sfmt;
