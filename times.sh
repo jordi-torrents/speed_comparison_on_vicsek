@@ -10,39 +10,42 @@ N_reset=1000
 N_steps=1000
 seed=1234
 
-input_file="times_input_file.dat"
+input_file="input_file.tmp"
 
-Ls="2 4 8 16"
+Ls="2 3 4 5 6 7 8 9 10"
 
-> times_fortran.out
-> times_cpp.out
-> times_c.out
-> times_python.out
-> Ns.out
+echo "fortran" > times_fortran.tmp
+echo "cpp" > times_cpp.tmp
+echo "c" > times_c.tmp
+echo "python" > times_python.tmp
+echo "N" > Ns.tmp
+echo "L" > Ls.tmp
 
 echo "Computing different system sizes..."
 for L in $Ls; do
     > $input_file
     echo $L
-    echo "$L*$L*$rho" | bc >> Ns.out
+    echo $L >> Ls.tmp
+    echo "$L*$L*$rho" | bc >> Ns.tmp
     echo "$L L" >> $input_file
     echo "$v0 v0" >> $input_file
     echo "$rho rho" >> $input_file
     echo "$N_reset N_reset" >> $input_file
     echo "$N_steps N_steps" >> $input_file
     echo "$seed seed" >> $input_file
-    (/usr/bin/time -f "%e"  ./fortran.exe $input_file > tmp ) 2>>\
-    times_fortran.out
-    (/usr/bin/time -f "%e"  ./cpp.exe $input_file > tmp ) 2>>\
-    times_cpp.out
-    (/usr/bin/time -f "%e"  ./c.exe $input_file > tmp ) 2>>\
-    times_c.out
-    (/usr/bin/time -f "%e"  python3 main.py $input_file > tmp ) 2>>\
-    times_python.out
+    (/usr/bin/time -f "%e"  ./fortran.exe $input_file > /dev/null ) 2>>\
+    times_fortran.tmp
+    (/usr/bin/time -f "%e"  ./cpp.exe $input_file > /dev/null ) 2>>\
+    times_cpp.tmp
+    (/usr/bin/time -f "%e"  ./c.exe $input_file > /dev/null ) 2>>\
+    times_c.tmp
+    (/usr/bin/time -f "%e"  python3 main.py $input_file > /dev/null ) 2>>\
+    times_python.tmp
 done
 
-rm tmp
-rm $input_file
+paste Ls.tmp Ns.tmp times_fortran.tmp times_cpp.tmp times_c.tmp times_python.tmp| column -s $'\t' -t > times.dat
+
+rm *tmp
 
 echo "Plotting execution times"
-python3 plot_times.py
+python3 plot_times.py times.dat

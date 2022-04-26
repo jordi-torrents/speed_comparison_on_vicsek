@@ -4,205 +4,286 @@
 
 #include "SFMT-src-1.5.1/SFMT.h"
 sfmt_t sfmt;
-#define RAN (sfmt_genrand_real2(&sfmt))
-#define x 0
-#define y 1
-#define vx 2
-#define vy 3
 
-float rho, L, eta, v0;
-int N, N_cells, int_L;
+float rho, eta, v0;
+int N, N_cells, L, N_observations;
+float v0, inv_2L, eta, sum_phis, sum_phis2;
+const float th = 1.0, rand_const = (1.0 / 4294967296.0);
+float *pos, *vel;
+int *near_nbr_cells;
+sfmt_t sfmt;
 
-void set_geometry(int (*near_nbr_cells)[9])
+inline float pbc(float value)
+{
+    return value - (int)(inv_2L * value) * L;
+}
+
+inline float dist_PBC(float *pos1, float *pos2)
+{
+    float dx = pbc(*(pos1++) - *(pos2++));
+    float dy = pbc(*pos1 - *pos2);
+    return dx * dx + dy * dy;
+}
+
+inline float dist_simple(float *pos1, float *pos2)
+{
+    float dx = *(pos1++) - *(pos2++);
+    float dy = *pos1 - *pos2;
+    return dx * dx + dy * dy;
+}
+
+inline float wrap3(float value)
+{
+    return (value > 0 ? (value > L ? value - L : value) : value + L);
+}
+
+void get_and_reset_observables(float *phi, float *sigma_phi, float *xi_phi)
+{
+    *phi = sum_phis / ((float)(N) * (float)(N_observations));
+    *sigma_phi = sqrt(sum_phis2 / (float)(N_observations) - (sum_phis * sum_phis) / (float)(N_observations * N_observations)) / (float)(N);
+    *xi_phi = (sum_phis2 - (sum_phis * sum_phis) / (float)(N_observations)) / sum_phis;
+
+    sum_phis2 = 0.0;
+    sum_phis = 0.0;
+    N_observations = 0;
+}
+
+void update_observables()
+{
+
+    float sum_x = 0, sum_y = 0;
+
+    for (int i = 0; i < 2 * N;)
+    {
+        sum_x += vel[i++];
+        sum_y += vel[i++];
+    }
+
+    float polar_i_sq = sum_x * sum_x + sum_y * sum_y;
+
+    sum_phis += sqrt(polar_i_sq);
+    sum_phis2 += polar_i_sq;
+    N_observations++;
+}
+
+void randomize_system()
+{
+    int random_lenght = fmax(3 * N, sfmt_get_min_array_size32(&sfmt));
+    uint32_t random[random_lenght];
+    sfmt_fill_array32(&sfmt, random, random_lenght);
+
+    int rand_indx = 0;
+    float theta;
+    for (int i = 0; i < N; i++)
+    {
+        pos[2 * i] = rand_const * random[rand_indx++] * L;
+        pos[2 * i + 1] = rand_const * random[rand_indx++] * L;
+        theta = rand_const * random[rand_indx++] * 6.283185307;
+        vel[2 * i] = cos(theta);
+        vel[2 * i + 1] = sin(theta);
+    }
+}
+
+void integrate(int steps, int update_obs)
+{
+    float *integr = (float *)malloc(2 * N * sizeof(float));
+    int *header = (int *)malloc(N_cells * sizeof(int));
+    int *cell_list = (int *)malloc(2 * N * sizeof(int));
+
+    // float integr[2 * N];
+    // int header[N_cells];
+    // int cell_list[2 * N];
+
+    float particle_direction[N];
+    int random_lenght = fmax(N, sfmt_get_min_array_size32(&sfmt));
+    uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
+    const float factor1 = eta * 2.0 * 3.14159265359 * rand_const, float_L = (float)L;
+    const float factor2 = -eta * 3.14159265359;
+
+    // TODO: Create an array of pointers do every Y element (another for X) of integr (or vel os pos...)
+    // Objective. Clean up the code without (2*i + 1) while having contiguous x/y components.
+
+    for (int step = 0; step < steps; step++)
+    {
+        for (int i = 0; i < N_cells; i++)
+            header[i] = -1;
+
+        for (int i = 0; i < 2 * N; i++)
+            integr[i] = vel[i];
+
+        for (int i = 0; i < 2 * N; i += 2)
+        {
+            int cell = (int)(pos[i]) + L * ((int)(pos[i + 1]));
+            // printf("%f, %i\n", pos[i], (int)(pos[i]) % L);
+            cell_list[i] = header[cell];
+            header[cell] = i;
+        }
+
+        for (int cell = 0; cell < N_cells; cell++)
+        {
+            int *nbr_indx = &near_nbr_cells[cell * 4];
+            for (int i = header[cell]; i > -1; i = cell_list[i])
+            {
+
+                for (int j = cell_list[i]; j > -1; j = cell_list[j])
+                {
+                    if (dist_simple(&pos[i], &pos[j]) < th)
+                    {
+                        integr[i] += vel[j];
+                        integr[i + 1] += vel[j + 1];
+                        integr[j] += vel[i];
+                        integr[j + 1] += vel[i + 1];
+                    }
+                }
+
+                for (int j = header[*nbr_indx++]; j > -1; j = cell_list[j])
+                {
+                    if (dist_PBC(&pos[i], &pos[j]) < th)
+                    {
+                        integr[i] += vel[j];
+                        integr[i + 1] += vel[j + 1];
+                        integr[j] += vel[i];
+                        integr[j + 1] += vel[i + 1];
+                    }
+                }
+
+                for (int j = header[*nbr_indx++]; j > -1; j = cell_list[j])
+                {
+                    if (dist_PBC(&pos[i], &pos[j]) < th)
+                    {
+                        integr[i] += vel[j];
+                        integr[i + 1] += vel[j + 1];
+                        integr[j] += vel[i];
+                        integr[j + 1] += vel[i + 1];
+                    }
+                }
+
+                for (int j = header[*nbr_indx++]; j > -1; j = cell_list[j])
+                {
+                    if (dist_PBC(&pos[i], &pos[j]) < th)
+                    {
+                        integr[i] += vel[j];
+                        integr[i + 1] += vel[j + 1];
+                        integr[j] += vel[i];
+                        integr[j + 1] += vel[i + 1];
+                    }
+                }
+
+                for (int j = header[*nbr_indx]; j > -1; j = cell_list[j])
+                {
+                    if (dist_PBC(&pos[i], &pos[j]) < th)
+                    {
+                        integr[i] += vel[j];
+                        integr[i + 1] += vel[j + 1];
+                        integr[j] += vel[i];
+                        integr[j + 1] += vel[i + 1];
+                    }
+                }
+                nbr_indx -= 3;
+            }
+        }
+
+        sfmt_fill_array32(&sfmt, random, random_lenght);
+
+        for (int i = 0; i < N; i++)
+
+            particle_direction[i] = atan2(integr[2 * i + 1], integr[2 * i]) + factor1 * random[i] + factor2;
+
+        for (int i = 0; i < N; i++)
+        {
+            vel[2 * i] = cos(particle_direction[i]);
+            vel[2 * i + 1] = sin(particle_direction[i]);
+        }
+
+        for (int i = 0; i < 2 * N; i++)
+        {
+            pos[i] = wrap3(pos[i] + v0 * vel[i]);
+        }
+
+        if (update_obs)
+            update_observables();
+    }
+    free(header);
+    free(cell_list);
+    free(integr);
+    free(random);
+}
+
+void set_geometry()
 {
     int cell, cell_X, cell_Y, nbr_cell_X, nbr_cell_Y, nbr_cell, k;
-    int nbr_X[9] = {-1, 0, 1, -1, 0, 1, -1, 0, 1};
-    int nbr_Y[9] = {1, 1, 1, 0, 0, 0, -1, -1, -1};
+    int nbr_X[] = {-1, 0, 1, -1};
+    int nbr_Y[] = {1, 1, 1, 0};
 
-    for (cell_Y = 0; cell_Y < int_L; cell_Y++)
+    for (cell_Y = 0; cell_Y < L; cell_Y++)
     {
-        for (cell_X = 0; cell_X < int_L; cell_X++)
+        for (cell_X = 0; cell_X < L; cell_X++)
         {
-            cell = cell_X + int_L * cell_Y;
-            for (k = 0; k < 9; k++)
+            cell = cell_X + L * cell_Y;
+            for (k = 0; k < 4; k++)
             {
                 nbr_cell_X = cell_X + nbr_X[k];
                 nbr_cell_Y = cell_Y + nbr_Y[k];
 
-                if (nbr_cell_X < 0)
-                    nbr_cell_X += int_L;
+                // nbr_cell_X = (nbr_cell_X > 0 ? (nbr_cell_X >= L ? nbr_cell_X - L : nbr_cell_X) : nbr_cell_X + L);
+                // nbr_cell_Y = (nbr_cell_Y > 0 ? (nbr_cell_Y >= L ? nbr_cell_Y - L : nbr_cell_Y) : nbr_cell_Y + L);
 
-                if (nbr_cell_X >= int_L)
-                    nbr_cell_X -= int_L;
+                if (nbr_cell_X < 0)
+                    nbr_cell_X += L;
+
+                if (nbr_cell_X >= L)
+                    nbr_cell_X -= L;
 
                 if (nbr_cell_Y < 0)
-                    nbr_cell_Y += int_L;
+                    nbr_cell_Y += L;
 
-                if (nbr_cell_Y >= int_L)
-                    nbr_cell_Y -= int_L;
+                if (nbr_cell_Y >= L)
+                    nbr_cell_Y -= L;
 
-                nbr_cell = nbr_cell_X + int_L * nbr_cell_Y;
+                nbr_cell = nbr_cell_X + L * nbr_cell_Y;
 
-                near_nbr_cells[cell][k] = nbr_cell;
+                near_nbr_cells[4 * cell + k] = nbr_cell;
             }
         }
-    }
-}
-
-void neighbours_direction(float (*data)[4], int (*near_nbr_cells)[9], float **particle_direction, float *cell_direction)
-{
-    float cell_vel_x[N_cells]; // = {0.0};
-    float cell_vel_y[N_cells]; // = {0.0};
-    float cell_mean_vel_x, cell_mean_vel_y;
-    int cell;
-    int occupied[N_cells]; // = {0};
-    // memset(occupied, 0, N_cells * sizeof(int));
-    // memset(cell_vel_x, 0, N_cells * sizeof(float));
-    // memset(cell_vel_y, 0, N_cells * sizeof(float));
-
-    for (cell = 0; cell < N_cells; cell++)
-    {
-        cell_vel_x[cell] = 0.0;
-        cell_vel_y[cell] = 0.0;
-        occupied[cell] = 0;
-    }
-
-    for (int i = 0; i < N; i++)
-    {
-        cell = (int_L + (int)data[i][x]) % int_L + int_L * ((int_L + (int)data[i][y]) % int_L);
-
-        occupied[cell] = 1;
-        cell_vel_x[cell] += data[i][vx];
-        cell_vel_y[cell] += data[i][vy];
-        particle_direction[i] = &cell_direction[cell];
-    }
-
-    for (cell = 0; cell < N_cells; cell++)
-    {
-        if (occupied[cell] == 1)
-        {
-            cell_mean_vel_x = 0.0;
-            cell_mean_vel_y = 0.0;
-
-            for (int i = 0; i < 9; i++)
-            {
-                int nbr_cell = near_nbr_cells[cell][i];
-                cell_mean_vel_x += cell_vel_x[nbr_cell];
-                cell_mean_vel_y += cell_vel_y[nbr_cell];
-            }
-
-            cell_direction[cell] = atan2(cell_mean_vel_y, cell_mean_vel_x);
-        }
-    }
-}
-
-void integrate_and_mesure(
-    float (*data)[4],
-    int (*near_nbr_cells)[9],
-    int steps,
-    float *polar,
-    float *polar2)
-{
-    float polar_i, sum_x = 0.0, sum_y = 0.0, cell_direction[N_cells];
-    float *particle_direction[N], theta, count_polar = 0.0, count_polar2 = 0.0;
-
-    for (int step = 0; step < steps; step++)
-    {
-        sum_x = 0.0;
-        sum_y = 0.0;
-        neighbours_direction(data, near_nbr_cells, particle_direction, cell_direction);
-        for (int i = 0; i < N; i++)
-        {
-            theta = *particle_direction[i] + eta * 6.283185307179586 * (RAN - 0.5);
-            data[i][vx] = cos(theta);
-            data[i][vy] = sin(theta);
-            data[i][x] += v0 * data[i][vx];
-            data[i][y] += v0 * data[i][vy];
-            sum_x += data[i][vx];
-            sum_y += data[i][vy];
-        }
-
-        polar_i = sqrt(sum_x * sum_x + sum_y * sum_y);
-        count_polar += polar_i;
-        count_polar2 += (polar_i * polar_i);
-        if (step % 5000 == 0)
-            for (int i = 0; i < N; i++)
-            {
-                data[i][x] = fmod(data[i][x], L);
-                data[i][y] = fmod(data[i][y], L);
-            }
-    }
-    *polar = count_polar / ((double)(N * steps));
-    *polar2 = count_polar2 / ((double)(N * N * steps));
-}
-
-void integrate(float (*data)[4], int (*near_nbr_cells)[9], int steps)
-{
-    float cell_direction[N_cells];
-    float *particle_direction[N];
-    for (int step = 0; step < steps; step++)
-    {
-        neighbours_direction(data, near_nbr_cells, particle_direction, cell_direction);
-        for (int i = 0; i < N; i++)
-        {
-            float theta = *particle_direction[i] + eta * 6.283185307179586 * (RAN - 0.5);
-            data[i][vx] = cos(theta);
-            data[i][vy] = sin(theta);
-            data[i][x] += v0 * data[i][vx];
-            data[i][y] += v0 * data[i][vy];
-        }
-
-        if (step % 5000 == 0)
-            for (int i = 0; i < N; i++)
-            {
-                data[i][x] = fmod(data[i][x], L);
-                data[i][y] = fmod(data[i][y], L);
-            }
     }
 }
 
 int main(int argc, char *argv[])
 {
-    float polar = 0.0, polar2 = 0.0;
+    float phi, sigma_phi, xi_phi;
     int N_reset, N_steps, seed;
 
-    // init_genrand(123);
-    sfmt_init_gen_rand(&sfmt, 12345);
-    // printf("%i %i\n", sfmt_get_min_array_size32(&sfmt), sfmt_get_min_array_size64(&sfmt));
-
     FILE *in_file = fopen(argv[1], "r"); // read only
-    if (fscanf(in_file, "%d %*s\n%f %*s\n%f %*s\n%i %*s\n%i %*s\n%i %*s\n", &int_L, &v0, &rho, &N_reset, &N_steps, &seed) != 6)
+    if (fscanf(in_file, "%d %*s\n%f %*s\n%f %*s\n%i %*s\n%i %*s\n%i %*s\n", &L, &v0, &rho, &N_reset, &N_steps, &seed) != 6)
         printf("ERROR on input!");
-
     fclose(in_file);
 
-    L = (double)int_L;
-    N = (int)L * L * rho;
-    N_cells = int_L * int_L;
+    // printf("%d \n%f \n%f \n%i \n%i \n%i \n", L, v0, rho, N_reset, N_steps, seed);
 
-    float data[N][4];
-    int near_nbr_cells[N_cells][9];
+    sfmt_init_gen_rand(&sfmt, seed);
 
-    for (int i = 0; i < N; i++)
-    {
-        float theta = RAN * 6.283185307;
-        data[i][x] = RAN * L;
-        data[i][y] = RAN * L;
-        data[i][vx] = cos(theta);
-        data[i][vy] = sin(theta);
-    }
+    N = (int)((float)L * (float)L * rho);
+    N_cells = L * L;
+    inv_2L = (2.0 / (float)(L));
 
-    set_geometry(near_nbr_cells);
+    pos = (float *)malloc(2 * N * sizeof(float));
+    vel = (float *)malloc(2 * N * sizeof(float));
+    near_nbr_cells = (int *)malloc(N_cells * 4 * sizeof(int));
+
+    randomize_system();
+    set_geometry();
+    get_and_reset_observables(&phi, &sigma_phi, &xi_phi);
 
     eta = 0.0;
 
-    integrate(data, near_nbr_cells, N_reset);
+    integrate(N_reset, 0);
 
     for (eta = 0.0; eta < 1.01; eta += 0.05)
     {
-        integrate(data, near_nbr_cells, N_reset);
-        integrate_and_mesure(data, near_nbr_cells, N_steps, &polar, &polar2);
+        integrate(N_reset, 0);
+        integrate(N_steps, 1);
+        get_and_reset_observables(&phi, &sigma_phi, &xi_phi);
 
-        printf("%f, %f, %f\n", eta, polar, sqrt(polar2 - (polar * polar)));
+        printf("%f, %f, %f, %f\n", eta, phi, sigma_phi, xi_phi);
     }
 }

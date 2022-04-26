@@ -1,7 +1,7 @@
 import numba as nb
 import numpy as np
 import sys
-
+from math import sqrt
 
 with open(sys.argv[1], "r") as file:
     L = int(file.readline().split()[0])
@@ -11,117 +11,157 @@ with open(sys.argv[1], "r") as file:
     N_steps = int(file.readline().split()[0])
     seed = int(file.readline().split()[0])
 
+
+N_cells = L * L
+N = int((L * L * rho + 2.0) / 4) * 4
+with np.errstate(divide="ignore"):
+    inv_2L = np.divide(2.0, L)
+v0 = 0.03
+th = 1.0
+
+pos = np.empty((N, 2))
+vel = np.empty((N, 2))
+
 np.random.seed(seed)
 
-N = int(L * L * rho)
-N_cells = L * L
+sum_phis2 = 0.0
+sum_phis = 0.0
+N_observations = 0
 
-
+# RANDOMIZE THE SYSTEM
+pos = np.random.rand(N, 2) * L
 thetas = np.random.rand(N) * 2 * np.pi
-x = np.random.rand(N) * L
-y = np.random.rand(N) * L
-vx = np.cos(thetas)
-vy = np.sin(thetas)
+vel[:, 0] = np.cos(thetas)
+vel[:, 1] = np.sin(thetas)
 
-
-nbr_X = np.array([-1, 0, 1, -1, 0, 1, -1, 0, 1])
-nbr_Y = np.array([1, 1, 1, 0, 0, 0, -1, -1, -1])
-
-near_nbr_cells = np.zeros((N_cells, 9), int)
-
+# SET GEOMETRY
+nbr_X = np.array([-1, 0, 1, -1])
+nbr_Y = np.array([1, 1, 1, 0])
+nbr_indx = np.zeros((N_cells, 4), int)
 for cell_Y in range(L):
     for cell_X in range(L):
         cell = cell_X + L * cell_Y
         nbr_x = (cell_X + nbr_X) % L
         nbr_y = (cell_Y + nbr_Y) % L
-        near_nbr_cells[cell] = nbr_x + L * nbr_y
+        nbr_indx[cell] = nbr_x + L * nbr_y
 
 
 @nb.njit
-def neighbours_direction(cell_direction, where_is):
-
-    cell_vel_x = np.zeros(N_cells)
-    cell_vel_y = np.zeros(N_cells)
-    occupied = np.zeros(N_cells)
-
-    # occupied[where_is] = True
-    for i in range(N):
-        occupied[where_is[i]] = True
-        cell_vel_x[where_is[i]] = cell_vel_x[where_is[i]] + vx[i]
-        cell_vel_y[where_is[i]] = cell_vel_y[where_is[i]] + vy[i]
-
-    for cell in range(N_cells):
-
-        if occupied[cell]:
-
-            cell_mean_vel_x = np.sum(cell_vel_x[near_nbr_cells[cell]])
-            cell_mean_vel_y = np.sum(cell_vel_y[near_nbr_cells[cell]])
-
-            cell_direction[cell] = np.arctan2(cell_mean_vel_y, cell_mean_vel_x)
-
-    # print(cell_direction)
+def pbc(value):
+    return value - int(inv_2L * value) * L
 
 
 @nb.njit
-def integrate_and_mesure(eta, steps, x, y, vx, vy):
-    cell_direction = np.zeros(N_cells)
-    count_polar = 0.0
-    count_polar2 = 0.0
-    noise_constant = 2 * eta * np.pi
-    theta = np.zeros(N)
+def dist_PBC(pos1, pos2):
+    dx = pbc(pos1[0] - pos2[0])
+    dy = pbc(pos1[1] - pos2[1])
+    return dx * dx + dy * dy
 
-    for step in range(steps):
 
-        where_is = x.astype(np.int32) + L * y.astype(np.int32)
-        neighbours_direction(cell_direction, where_is)
-        # print(cell_direction)
+@nb.njit
+def dist_simple(pos1, pos2):
+    dx = pos1[0] - pos2[0]
+    dy = pos1[1] - pos2[1]
+    return dx * dx + dy * dy
 
-        randoms = np.random.rand(N) - 0.5
+
+@nb.njit
+def integrate(steps, update_obs, pos, vel, eta):
+
+    header = np.empty((N_cells), nb.int32)
+    cell_list = np.empty(N, nb.int32)
+    integr = np.empty_like(vel)
+    sum_phis = 0.0
+    sum_phis2 = 0.0
+
+    factor1 = eta * 6.283185307179586
+    factor2 = -eta * 3.14159265359
+
+    for _ in range(steps):
+
+        header[:] = -1
+        integr[:] = vel
+
         for i in range(N):
-            theta[i] = cell_direction[where_is[i]] + noise_constant * randoms[i]
+            cell = int(pos[i, 0]) + L * int(pos[i, 1])
+            cell_list[i] = header[cell]
+            header[cell] = i
 
-        vx = np.cos(theta)
-        vy = np.sin(theta)
-        x = (x + v0 * vx) % L
-        y = (y + v0 * vy) % L
+        for cell in range(N_cells):
 
-        polar_i = np.sqrt(np.sum(vx) ** 2 + np.sum(vy) ** 2)
-        count_polar = count_polar + polar_i
-        count_polar2 = count_polar2 + polar_i * polar_i
-        # if step % 5 == 0:
-        #     x = x % L
-        #     y = y % L
+            i = header[cell]
+            while i > -1:
 
-    polar = count_polar / (float(N * steps))
-    polar2 = count_polar2 / (float(N * N * steps))
+                j = cell_list[i]
+                while j > -1:
+                    if dist_simple(pos[i], pos[j]) < th:
+                        integr[i] += vel[j]
+                        integr[j] += vel[i]
+                    j = cell_list[j]
 
-    return polar, polar2, x, y, vx, vy
+                j = header[nbr_indx[cell, 0]]
+                while j > -1:
+                    if dist_PBC(pos[i], pos[j]) < th:
+                        integr[i] += vel[j]
+                        integr[j] += vel[i]
+                    j = cell_list[j]
+
+                j = header[nbr_indx[cell, 1]]
+                while j > -1:
+                    if dist_PBC(pos[i], pos[j]) < th:
+                        integr[i] += vel[j]
+                        integr[j] += vel[i]
+                    j = cell_list[j]
+
+                j = header[nbr_indx[cell, 2]]
+                while j > -1:
+                    if dist_PBC(pos[i], pos[j]) < th:
+                        integr[i] += vel[j]
+                        integr[j] += vel[i]
+                    j = cell_list[j]
+
+                j = header[nbr_indx[cell, 3]]
+                while j > -1:
+                    if dist_PBC(pos[i], pos[j]) < th:
+                        integr[i] += vel[j]
+                        integr[j] += vel[i]
+                    j = cell_list[j]
+
+                i = cell_list[i]
+
+        particle_direction = (
+            np.arctan2(integr[:, 1], integr[:, 0])
+            + factor1 * np.random.rand(N)
+            + factor2
+        )
+
+        vel[:, 0] = np.cos(particle_direction)
+        vel[:, 1] = np.sin(particle_direction)
+
+        pos = (pos + v0 * vel) % L
+
+        if update_obs:
+            sum_x, sum_y = np.sum(vel, axis=0)
+            polar_i_sq = sum_x * sum_x + sum_y * sum_y
+
+            sum_phis += sqrt(polar_i_sq)
+            sum_phis2 += polar_i_sq
+
+    if update_obs:
+        phi = sum_phis / (N * N_steps)
+        sigma_phi = sqrt(sum_phis2 / N_steps - (sum_phis / N_steps) ** 2) / N
+        xi_phi = (sum_phis2 - sum_phis**2 / N_steps) / sum_phis
+
+    return pos, vel, phi, sigma_phi, xi_phi
 
 
 eta = 0.0
-polar, polar2, x, y, vx, vy = integrate_and_mesure(eta, N_reset, x, y, vx, vy)
+pos, vel, phi, sigma_phi, xi_phi = integrate(N_reset, False, pos, vel, eta)
 
 for eta in np.linspace(0, 1, 20):
-    polar, polar2, x, y, vx, vy = integrate_and_mesure(eta, N_reset, x, y, vx, vy)
-    polar, polar2, x, y, vx, vy = integrate_and_mesure(eta, N_steps, x, y, vx, vy)
-    print(f"{eta:.2f}, {polar:.3f}, {np.sqrt(polar2 - (polar * polar)):.3f}")
-
-
-# import matplotlib.pyplot as plt
-# from matplotlib.animation import FuncAnimation
-
-# fig, ax = plt.subplots()
-# line = ax.plot(x, y, "k.")[0]
-# ax.set(xlim=(0, L), ylim=(0, L), aspect=1, xticks=np.arange(L), yticks=np.arange(L))
-# ax.grid(1)
-
-
-# def animate(i):
-#     global x, y, vx, vy
-#     polar, polar2, x, y, vx, vy = integrate_and_mesure(0.65, 1, x, y, vx, vy)
-#     line.set_data(x, y)
-#     return (line,)
-
-
-# ani = FuncAnimation(fig, animate, frames=10, blit=True, interval=1)
-# plt.show()
+    pos, vel, phi, sigma_phi, xi_phi = integrate(N_reset, False, pos, vel, eta)
+    pos, vel, phi, sigma_phi, xi_phi = integrate(N_steps, True, pos, vel, eta)
+    # print(eta)
+    # phi, sigma_phi, xi_phi = get_and_reset_observables()
+    print(f"{eta:.2f}, {phi:.3f}, {sigma_phi:.3f}, {xi_phi:.3f}")
+#

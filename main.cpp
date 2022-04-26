@@ -6,12 +6,6 @@
 #include <vector>
 #include <algorithm>
 
-// #include "mt19937-64.c"
-// #define RAN (genrand64_real2())
-
-// #include "mt19937ar.c"
-// #define RAN (genrand_real2())
-
 #include "SFMT-src-1.5.1/SFMT.h"
 
 using namespace std;
@@ -20,7 +14,7 @@ class vicsek_system
 {
 private:
     float v0, inv_2L, th = 1.0, rand_const = (1.0 / 4294967296.0);
-    const int L, N_cells, N;
+    int L, N_cells, N;
     // float *x, *y, *vx, *vy;
     // vector<float> x, y;
     // vector<vector<float>> vel;, pos;
@@ -174,7 +168,7 @@ public:
 
         int random_lenght = max(3 * N, sfmt_get_min_array_size32(&sfmt));
 
-        uint32_t random[random_lenght];
+        uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
 
         sfmt_fill_array32(&sfmt, random, random_lenght);
         int rand_indx = 0;
@@ -186,15 +180,19 @@ public:
             vel[2 * i] = cos(theta);
             vel[2 * i + 1] = sin(theta);
         }
+        free(random);
     }
 
     void integrate(int steps = 1, int update_obs = 0)
     {
 
-        // vector<vector<float, 2>, N> integr;
-        float *integr = (float *)malloc(2 * N * sizeof(float));
-        int *header = (int *)malloc(N_cells * sizeof(int));
-        int *cell_list = (int *)malloc(2 * N * sizeof(int));
+        // float *integr = (float *)malloc(2 * N * sizeof(float));
+        // int *header = (int *)malloc(N_cells * sizeof(int));
+        // int *cell_list = (int *)malloc(2 * N * sizeof(int));
+
+        vector<float> integr(2 * N);
+        vector<int> header(N_cells);
+        vector<int> cell_list(2 * N);
 
         // float integr[2 * N];
         // int header[N_cells];
@@ -203,11 +201,11 @@ public:
         // vector<int> header(N_cells);
         // vector<int> cell_list(2 * N);
 
-        float particle_direction[N];
+        vector<float> particle_direction(N);
         int random_lenght = max(N, sfmt_get_min_array_size32(&sfmt));
         uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
-        float factor1 = eta * 6.283185307179586 * rand_const;
-        float factor2 = -eta * 3.14159265359;
+        const float factor1 = eta * 6.283185307179586 * rand_const;
+        const float factor2 = -eta * 3.14159265359;
 
         // TODO: Create an array of pointers do every Y element (another for X) of integr (or vel os pos...)
         // Objective. Clean up the code without (2*i + 1) while having contiguous x/y components.
@@ -222,7 +220,7 @@ public:
 
             for (int i = 0; i < 2 * N; i += 2)
             {
-                int cell = int(pos[i]) % L + L * (int(pos[i + 1]) % L);
+                int cell = int(pos[i]) + L * (int(pos[i + 1]));
                 cell_list[i] = header[cell];
                 header[cell] = i;
             }
@@ -311,9 +309,9 @@ public:
             if (update_obs)
                 update_observables();
         }
-        free(header);
-        free(cell_list);
-        free(integr);
+        // free(header);
+        // free(cell_list);
+        // free(integr);
         free(random);
     }
 };
@@ -325,7 +323,6 @@ int main(int argc, char *argv[])
     float phi, sigma_phi, xi_phi;
 
     fstream myfile(argv[1]);
-    cout << argv[1] << endl;
     string line;
     myfile >> L >> line;
     myfile >> v0 >> line;
@@ -334,11 +331,6 @@ int main(int argc, char *argv[])
     myfile >> N_steps >> line;
     myfile >> seed >> line;
     myfile.close();
-
-    cout << L << endl;
-    cout << v0 << endl;
-    cout << rho << endl;
-    cout << N_steps << endl;
 
     vicsek_system system(rho, v0, L, seed);
 
@@ -356,4 +348,5 @@ int main(int argc, char *argv[])
 
         cout << system.eta << ',' << phi << ',' << sigma_phi << ',' << xi_phi << endl;
     }
+    // delete system;
 }

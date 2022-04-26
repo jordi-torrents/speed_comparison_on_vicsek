@@ -14,7 +14,9 @@ all: $(LANGUAGES)
 $(LANGUAGES): %: %.exe
 # run_$(LANGUAGES): %: $(LANGUAGES).out
 run_cpp: cpp.out
+run_c: c.out
 run_fortran: fortran.out
+run_python: python.out
 
 c.exe: main.c
 	$(C_COMP) $(FLAGS) main.c $(C_RANDOM) -DSFMT_MEXP=19937 -o $@ -lm
@@ -35,14 +37,19 @@ mt19937-64.o: mt19937-64.f95
 
 
 fortran.out: fortran.exe input.dat
-	./fortran.exe > $@
+	/usr/bin/time -f "%e" ./$^ > $@
 
+c.out: c.exe input.dat
+	/usr/bin/time -f "%e" ./$^ > $@
 
 cpp.out: cpp.exe input.dat
-	# ./cpp.exe > $@
-	time ./cpp.exe > $@
+	/usr/bin/time -f "%e" ./$^ > $@
 
-plot: fortran.out cpp.out
+
+python.out: main.py input.dat
+	/usr/bin/time -f "%e" python3 $^ > $@
+
+plot: fortran.out cpp.out c.out python.out
 	python3 plot_results.py
 
 clean:
