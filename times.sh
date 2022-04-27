@@ -43,7 +43,13 @@ for L in $Ls; do
     times_python.tmp
 done
 
-paste Ls.tmp Ns.tmp times_fortran.tmp times_cpp.tmp times_c.tmp times_python.tmp| column -s $'\t' -t > times.dat
+paste Ls.tmp Ns.tmp times_fortran.tmp times_cpp.tmp times_c.tmp times_python.tmp |
+column -t > times.dat
+
+# paste -d "," Ls.tmp Ns.tmp times_fortran.tmp times_cpp.tmp times_c.tmp times_python.tmp |
+# sed 's/,/:,/g' |
+# column -t -s: |
+# sed 's/ ,/,/g' > times.dat
 
 rm *tmp
 

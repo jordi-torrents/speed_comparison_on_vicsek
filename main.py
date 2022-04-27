@@ -158,7 +158,7 @@ def integrate(steps, update_obs, pos, vel, eta):
 eta = 0.0
 pos, vel, phi, sigma_phi, xi_phi = integrate(N_reset, False, pos, vel, eta)
 
-for eta in np.linspace(0, 1, 20):
+for eta in np.linspace(0, 1, 21):
     pos, vel, phi, sigma_phi, xi_phi = integrate(N_reset, False, pos, vel, eta)
     pos, vel, phi, sigma_phi, xi_phi = integrate(N_steps, True, pos, vel, eta)
     # print(eta)

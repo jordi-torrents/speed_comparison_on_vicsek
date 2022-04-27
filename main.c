@@ -6,7 +6,7 @@
 sfmt_t sfmt;
 
 float rho, eta, v0;
-int N, N_cells, L, N_observations;
+int N, N_cells, L, N_observations, N4;
 float v0, inv_2L, eta, sum_phis, sum_phis2;
 const float th = 1.0, rand_const = (1.0 / 4294967296.0);
 float *pos, *vel;
@@ -68,7 +68,7 @@ void update_observables()
 
 void randomize_system()
 {
-    int random_lenght = fmax(3 * N, sfmt_get_min_array_size32(&sfmt));
+    int random_lenght = fmax(3 * N4, sfmt_get_min_array_size32(&sfmt));
     uint32_t random[random_lenght];
     sfmt_fill_array32(&sfmt, random, random_lenght);
 
@@ -95,7 +95,7 @@ void integrate(int steps, int update_obs)
     // int cell_list[2 * N];
 
     float particle_direction[N];
-    int random_lenght = fmax(N, sfmt_get_min_array_size32(&sfmt));
+    int random_lenght = fmax(N4, sfmt_get_min_array_size32(&sfmt));
     uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
     const float factor1 = eta * 2.0 * 3.14159265359 * rand_const, float_L = (float)L;
     const float factor2 = -eta * 3.14159265359;
@@ -113,7 +113,7 @@ void integrate(int steps, int update_obs)
 
         for (int i = 0; i < 2 * N; i += 2)
         {
-            int cell = (int)(pos[i]) + L * ((int)(pos[i + 1]));
+            int cell = (int)(pos[i]) % L + L * ((int)(pos[i + 1]) % L);
             // printf("%f, %i\n", pos[i], (int)(pos[i]) % L);
             cell_list[i] = header[cell];
             header[cell] = i;
@@ -263,6 +263,7 @@ int main(int argc, char *argv[])
     sfmt_init_gen_rand(&sfmt, seed);
 
     N = (int)((float)L * (float)L * rho);
+    N4 = 4 * (N / 4) + 4;
     N_cells = L * L;
     inv_2L = (2.0 / (float)(L));
 
