@@ -17,9 +17,10 @@ private:
     int L, N_cells, N;
     // float *x, *y, *vx, *vy;
     // vector<float> x, y;
-    // vector<vector<float>> vel;, pos;
-    float *pos, *vel;
-    int *near_nbr_cells;
+    vector<float> vel, pos;
+    // float *pos, *vel;
+    // int *near_nbr_cells;
+    vector<int> near_nbr_cells;
     sfmt_t sfmt;
 
     inline float pbc(float value)
@@ -71,20 +72,21 @@ public:
                               N(int((L_in * L_in * rho_in + 2.0) / 4) * 4),
                               inv_2L(2.0 / float(L_in))
     {
-        pos = (float *)malloc(2 * N * sizeof(float));
-        vel = (float *)malloc(2 * N * sizeof(float));
+        // pos = (float *)malloc(2 * N * sizeof(float));
+        // vel = (float *)malloc(2 * N * sizeof(float));
 
-        // vel.resize(N);
+        vel.resize(2 * N);
         // for (int i = 0; i < N; i++)
         //     vel[i].resize(2);
 
-        // pos.resize(N);
+        pos.resize(2 * N);
         // for (int i = 0; i < N; i++)
         //     pos[i].resize(2);
 
         // vy.resize(N);
         // cout << sfmt_get_min_array_size32(&sfmt) << endl;
-        near_nbr_cells = (int *)malloc(N_cells * 4 * sizeof(int));
+        // near_nbr_cells = (int *)malloc(N_cells * 4 * sizeof(int));
+        near_nbr_cells.resize(N_cells * 4);
         sfmt_init_gen_rand(&sfmt, seed);
         randomize_system();
         set_geometry();
@@ -92,16 +94,16 @@ public:
         get_and_reset_observables(&junk, &junk, &junk);
     }
 
-    ~vicsek_system()
-    {
-        // free(x);
-        // free(y);
-        // free(vx);
-        // free(vy);
-        free(pos);
-        free(vel);
-        free(near_nbr_cells);
-    }
+    // ~vicsek_system()
+    // {
+    // free(x);
+    // free(y);
+    // free(vx);
+    // free(vy);
+    // free(pos);
+    // free(vel);
+    // free(near_nbr_cells);
+    // }
 
     void update_observables()
     {
@@ -168,9 +170,10 @@ public:
 
         int random_lenght = max(3 * N, sfmt_get_min_array_size32(&sfmt));
 
-        uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
+        // uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
+        vector<uint32_t> random(random_lenght);
 
-        sfmt_fill_array32(&sfmt, random, random_lenght);
+        sfmt_fill_array32(&sfmt, random.data(), random_lenght);
         int rand_indx = 0;
         for (int i = 0; i < N; i++)
         {
@@ -180,7 +183,7 @@ public:
             vel[2 * i] = cos(theta);
             vel[2 * i + 1] = sin(theta);
         }
-        free(random);
+        // free(random);
     }
 
     void integrate(int steps = 1, int update_obs = 0)
@@ -203,7 +206,9 @@ public:
 
         vector<float> particle_direction(N);
         int random_lenght = max(N, sfmt_get_min_array_size32(&sfmt));
-        uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
+
+        vector<uint32_t> random(random_lenght);
+        // uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
         const float factor1 = eta * 6.283185307179586 * rand_const;
         const float factor2 = -eta * 3.14159265359;
 
@@ -227,7 +232,7 @@ public:
 
             for (int cell = 0; cell < N_cells; cell++)
             {
-                int *nbr_indx = near_nbr_cells + cell * 4;
+                // int *nbr_indx = near_nbr_cells[] + cell * 4;
                 for (int i = header[cell]; i > -1; i = cell_list[i])
                 {
 
@@ -242,7 +247,7 @@ public:
                         }
                     }
 
-                    for (int j = header[*nbr_indx++]; j > -1; j = cell_list[j])
+                    for (int j = header[near_nbr_cells[4 * cell]]; j > -1; j = cell_list[j])
                     {
                         if (dist_PBC(&pos[i], &pos[j]) < th)
                         {
@@ -253,7 +258,7 @@ public:
                         }
                     }
 
-                    for (int j = header[*nbr_indx++]; j > -1; j = cell_list[j])
+                    for (int j = header[near_nbr_cells[4 * cell + 1]]; j > -1; j = cell_list[j])
                     {
                         if (dist_PBC(&pos[i], &pos[j]) < th)
                         {
@@ -264,7 +269,7 @@ public:
                         }
                     }
 
-                    for (int j = header[*nbr_indx++]; j > -1; j = cell_list[j])
+                    for (int j = header[near_nbr_cells[4 * cell + 2]]; j > -1; j = cell_list[j])
                     {
                         if (dist_PBC(&pos[i], &pos[j]) < th)
                         {
@@ -275,7 +280,7 @@ public:
                         }
                     }
 
-                    for (int j = header[*nbr_indx]; j > -1; j = cell_list[j])
+                    for (int j = header[near_nbr_cells[4 * cell + 3]]; j > -1; j = cell_list[j])
                     {
                         if (dist_PBC(&pos[i], &pos[j]) < th)
                         {
@@ -285,11 +290,11 @@ public:
                             integr[j + 1] += vel[i + 1];
                         }
                     }
-                    nbr_indx -= 3;
+                    // nbr_indx -= 3;
                 }
             }
 
-            sfmt_fill_array32(&sfmt, random, random_lenght);
+            sfmt_fill_array32(&sfmt, random.data(), random_lenght);
 
             for (int i = 0; i < N; i++)
 
@@ -312,7 +317,7 @@ public:
         // free(header);
         // free(cell_list);
         // free(integr);
-        free(random);
+        // free(random);
     }
 };
 
