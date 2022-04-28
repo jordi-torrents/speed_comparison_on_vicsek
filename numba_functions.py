@@ -36,11 +36,11 @@ def dist_simple(pos1, pos2):
     return dx * dx + dy * dy
 
 
+@nb.jit()
 @cc.export(
     "integrate",
     "Tuple((f8[:,:], f8[:,:], f8, f8, f8))(i4, b1, f8[:,:], f8[:,:], f8, i4, i4[:,:], f8)",
 )
-@nb.njit()
 def integrate(steps, update_obs, pos, vel, eta, L, nbr_indx, v0):
     N_cells = L * L
     inv_2L = 2.0 / L
@@ -131,7 +131,7 @@ def integrate(steps, update_obs, pos, vel, eta, L, nbr_indx, v0):
         phi = 0.0
         sigma_phi = 0.0
         xi_phi = 0.0
-    # print(pos[:5])
+
     return pos, vel, phi, sigma_phi, xi_phi
 
 
