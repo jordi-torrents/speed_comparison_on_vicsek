@@ -61,7 +61,6 @@ c.out: c.exe input.dat
 cpp.out: cpp.exe input.dat
 	/usr/bin/time -f "%e" ./$^ > $@
 
-
 python.out: main.py numba_funcs.so input.dat
 	/usr/bin/time -f "%e" $(PYTHON_PATH) main.py input.dat > $@
 
@@ -69,83 +68,46 @@ plot: fortran.out cpp.out c.out python.out
 	$(PYTHON_PATH) plot_results.py
 
 clean:
-	rm -f *.o
-	rm -f *.mod
-	rm -f *.exe
-	rm -f *.so
-	rm -f *.times
+	rm -f *.o *.mod *.exe *.so *.times *.tmp
 
 fortran.times: fortran.exe Ls.dat
-	echo "fortran" > tmp
-
+	echo "fortran" > $@
 	while read L; do\
-		> $(input_file);\
-		echo $$L;\
-		echo "$$L L" >> $(input_file);\
-		echo "$(v0) v0" >> $(input_file);\
-		echo "$(rho) rho" >> $(input_file);\
-		echo "$(N_reset) N_reset" >> $(input_file);\
-		echo "$(N_steps) N_steps" >> $(input_file);\
-		echo "$(seed) seed" >> $(input_file);\
-		(/usr/bin/time -f "%e"  ./fortran.exe $(input_file) > /dev/null ) 2>> tmp;\
+		echo -n "\r\tComputing Fortran with size $$L";\
+		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
+		(/usr/bin/time -f "%e"  ./fortran.exe $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	mv tmp $@
-	rm $(input_file)
+	echo
 
 cpp.times: cpp.exe Ls.dat
-	echo "cpp" > tmp
-
+	echo "cpp" > $@
 	while read L; do\
-		> $(input_file);\
-		echo $$L;\
-		echo "$$L L" >> $(input_file);\
-		echo "$(v0) v0" >> $(input_file);\
-		echo "$(rho) rho" >> $(input_file);\
-		echo "$(N_reset) N_reset" >> $(input_file);\
-		echo "$(N_steps) N_steps" >> $(input_file);\
-		echo "$(seed) seed" >> $(input_file);\
-		(/usr/bin/time -f "%e"  ./cpp.exe $(input_file) > /dev/null ) 2>> tmp;\
+		echo -n "\r\tComputing C++ with size $$L";\
+		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
+		(/usr/bin/time -f "%e"  ./cpp.exe $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	mv tmp $@
-	rm $(input_file)
+	echo
 
 c.times: c.exe Ls.dat
-	echo "c" > tmp
-	Ls="$(<Ls.dat)"
+	echo "c" > $@
 	while read L; do\
-		> $(input_file);\
-		echo $$L;\
-		echo "$$L L" >> $(input_file);\
-		echo "$(v0) v0" >> $(input_file);\
-		echo "$(rho) rho" >> $(input_file);\
-		echo "$(N_reset) N_reset" >> $(input_file);\
-		echo "$(N_steps) N_steps" >> $(input_file);\
-		echo "$(seed) seed" >> $(input_file);\
-		(/usr/bin/time -f "%e"  ./c.exe $(input_file) > /dev/null ) 2>> tmp;\
+		echo -n "\r\tComputing C with size $$L";\
+		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
+		(/usr/bin/time -f "%e"  ./c.exe $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	mv tmp $@
-	rm $(input_file)
+	echo
 
 python.times: numba_funcs.so main.py Ls.dat
-	echo "python" > tmp
-	Ls="$(<Ls.dat)"
+	echo "python" > $@
 	while read L; do\
-		> $(input_file);\
-		echo $$L;\
-		echo "$$L L" >> $(input_file);\
-		echo "$(v0) v0" >> $(input_file);\
-		echo "$(rho) rho" >> $(input_file);\
-		echo "$(N_reset) N_reset" >> $(input_file);\
-		echo "$(N_steps) N_steps" >> $(input_file);\
-		echo "$(seed) seed" >> $(input_file);\
-		(/usr/bin/time -f "%e"  $(PYTHON_PATH) main.py $(input_file) > /dev/null ) 2>> tmp;\
+		echo -n "\r\tComputing Python with size $$L";\
+		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
+		(/usr/bin/time -f "%e"  $(PYTHON_PATH) main.py $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	mv tmp $@
-	rm $(input_file)
+	echo
 
 Ns.times: Ls.dat
 	echo "L N" > $@
-	Ls="$(<Ls.dat)"
 	while read L; do\
 		echo -n "$$L " >> $@;\
 		echo "$$L*$$L*$(rho)" | bc >> $@;\
@@ -154,8 +116,24 @@ Ns.times: Ls.dat
 times.dat:Ns.times fortran.times c.times cpp.times python.times
 	paste $^ | column -t > times.dat
 
-times: times.dat
+times.png: times.dat
 	echo "Plotting execution times"
 	$(PYTHON_PATH) plot_times.py $^
 
-time: times
+time: times.png
+
+times: times.png
+
+
+
+
+# for i in $(seq 0 1023 | tqdm --total 1024); do
+#   do_something
+# done
+
+# or
+
+# for i in $(seq 0 1023); do
+#   do_something
+#   echo $i
+# done | tqdm --total 1024 >> /dev/null
