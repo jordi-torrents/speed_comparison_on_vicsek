@@ -4,6 +4,7 @@ BUILD_DIR := ./build
 SRC_DIRS := ./src
 FTR_COMP := gfortran
 C++_COMP := g++
+PYTHON_PATH := /usr/bin/python3
 C_COMP := gcc
 FLAGS := -O3 -msse2 -DHAVE_SSE2
 C_RANDOM := SFMT-src-1.5.1/SFMT.c
@@ -47,10 +48,10 @@ cpp.out: cpp.exe input.dat
 
 
 python.out: main.py input.dat
-	/usr/bin/time -f "%e" python3 $^ > $@
+	/usr/bin/time -f "%e" $(PYTHON_PATH) $^ > $@
 
 plot: fortran.out cpp.out c.out python.out
-	python3 plot_results.py
+	$(PYTHON_PATH) plot_results.py
 
 clean:
 	rm -f *.o

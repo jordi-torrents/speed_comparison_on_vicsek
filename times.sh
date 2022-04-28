@@ -12,7 +12,7 @@ seed=1234
 
 input_file="input_file.tmp"
 
-Ls="2 3 4 5 6 7 8 9 10"
+Ls="2 3 4 5 6 7 8 9 10 11 12 13 14 15 16"
 
 echo "fortran" > times_fortran.tmp
 echo "cpp" > times_cpp.tmp
@@ -39,7 +39,7 @@ for L in $Ls; do
     times_cpp.tmp
     (/usr/bin/time -f "%e"  ./c.exe $input_file > /dev/null ) 2>>\
     times_c.tmp
-    (/usr/bin/time -f "%e"  python3 main.py $input_file > /dev/null ) 2>>\
+    (/usr/bin/time -f "%e"  /usr/bin/python3 main.py $input_file > /dev/null ) 2>>\
     times_python.tmp
 done
 
