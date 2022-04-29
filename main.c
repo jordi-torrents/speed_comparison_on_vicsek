@@ -1,7 +1,5 @@
 #include <math.h>
-// #include <cstring>
 #include <string.h>
-
 #include "SFMT-src-1.5.1/SFMT.h"
 sfmt_t sfmt;
 
@@ -86,9 +84,9 @@ void randomize_system()
 
 void integrate(int steps, int update_obs)
 {
-    float *integr = (float *)malloc(2 * N * sizeof(float));
-    int *header = (int *)malloc(N_cells * sizeof(int));
-    int *cell_list = (int *)malloc(2 * N * sizeof(int));
+    float *integr = malloc(2 * N * sizeof(float));
+    int *header = malloc(N_cells * sizeof(int));
+    int *cell_list = malloc(2 * N * sizeof(int));
 
     // float integr[2 * N];
     // int header[N_cells];
@@ -96,7 +94,7 @@ void integrate(int steps, int update_obs)
 
     float particle_direction[N];
     int random_lenght = fmax(N4, sfmt_get_min_array_size32(&sfmt));
-    uint32_t *random = (uint32_t *)malloc(random_lenght * sizeof(uint32_t));
+    uint32_t *random = malloc(random_lenght * sizeof(uint32_t));
     const float factor1 = eta * 2.0 * 3.14159265359 * rand_const, float_L = (float)L;
     const float factor2 = -eta * 3.14159265359;
 
@@ -267,9 +265,9 @@ int main(int argc, char *argv[])
     N_cells = L * L;
     inv_2L = (2.0 / (float)(L));
 
-    pos = (float *)malloc(2 * N * sizeof(float));
-    vel = (float *)malloc(2 * N * sizeof(float));
-    near_nbr_cells = (int *)malloc(N_cells * 4 * sizeof(int));
+    pos = malloc(2 * N * sizeof(float));
+    vel = malloc(2 * N * sizeof(float));
+    near_nbr_cells malloc(N_cells * 4 * sizeof(int));
 
     randomize_system();
     set_geometry();
