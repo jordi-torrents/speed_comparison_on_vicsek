@@ -1,7 +1,15 @@
 # import numba as nb
 import numpy as np
 import sys
-import numba_funcs
+
+if len(sys.argv) >= 3:
+    if sys.argv[2] == "numba":
+        sys.path.append("bin")
+        import numba_funcs as funcs
+    else:
+        import python_functions as funcs
+else:
+    import python_functions as funcs
 
 
 with open(sys.argv[1], "r") as file:
@@ -48,16 +56,16 @@ for cell_Y in range(L):
 
 
 eta = 0.0
-pos, vel, phi, sigma_phi, xi_phi = numba_funcs.integrate(
+pos, vel, phi, sigma_phi, xi_phi = funcs.integrate(
     N_reset, False, pos, vel, eta, L, nbr_indx, v0
 )
 
 
 for eta in np.linspace(0, 1, 21):
-    pos, vel, phi, sigma_phi, xi_phi = numba_funcs.integrate(
+    pos, vel, phi, sigma_phi, xi_phi = funcs.integrate(
         N_reset, False, pos, vel, eta, L, nbr_indx, v0
     )
-    pos, vel, phi, sigma_phi, xi_phi = numba_funcs.integrate(
+    pos, vel, phi, sigma_phi, xi_phi = funcs.integrate(
         N_steps, True, pos, vel, eta, L, nbr_indx, v0
     )
     print(f"{eta:.2f}, {phi:.3f}, {sigma_phi:.3f}, {xi_phi:.3f}")

@@ -1,13 +1,16 @@
-TARGET_EXEC := prog.exe
-
-BUILD_DIR := ./build
-SRC_DIRS := ./src
 FTR_COMP := gfortran
 C++_COMP := g++
-PYTHON_PATH := /usr/bin/python3
+PYTHON_PATH := python3
 C_COMP := gcc
 FLAGS := -O3 -msse2 -DHAVE_SSE2
-C_RANDOM := SFMT-src-1.5.1/SFMT.c
+C_RAND := utils/SFMT-src-1.5.1/SFMT.c
+FORTRAN_RAND := utils/mt19937-64.f95
+SRC := ./src
+BIN := ./bin
+OBJ := ./obj
+TMP := ./tmp
+dir_guard=@mkdir -p $(@D)
+
 input_file="input_file.tmp"
 # DEFAULT INPUT VALUES
 v0=0.03
@@ -18,8 +21,9 @@ seed=1234
 
 
 
+
 LANGUAGES = fortran cpp c python
-all: fortran.exe cpp.exe c.exe numba_funcs.so
+all: $(BIN)/c.exe $(BIN)/fortran.exe $(BIN)/cpp.exe $(BIN)/numba_funcs.so
 # all: $(LANGUAGES)
 # $(LANGUAGES): %: %.exe
 # run_$(LANGUAGES): %: $(LANGUAGES).out
@@ -29,91 +33,114 @@ run_fortran: fortran.out
 run_python: python.out
 
 
-numba_funcs.so: numba_functions.py
+$(BIN)/numba_funcs.so: $(SRC)/numba_functions.py
+	$(dir_guard)
 	rm -f numba_funcs*
 	$(PYTHON_PATH) $^
-	mv numba_funcs* $@
+	mv $(SRC)/numba_funcs* $@
 
-c.exe: main.c
-	$(C_COMP) $(FLAGS) main.c $(C_RANDOM) -DSFMT_MEXP=19937 -o $@ -lm
+$(BIN)/c.exe: $(SRC)/main.c
+	$(dir_guard)
+	$(C_COMP) $(FLAGS) $^ $(C_RAND) -DSFMT_MEXP=19937 -o $@ -lm
 
-cpp.exe: main.cpp
-	$(C++_COMP) $(FLAGS) main.cpp $(C_RANDOM) -DSFMT_MEXP=19937 -o $@
+$(BIN)/cpp.exe: $(SRC)/main.cpp
+	$(dir_guard)
+	$(C++_COMP) $(FLAGS) $^ $(C_RAND) -DSFMT_MEXP=19937 -o $@
 
-fortran.exe: main.f95 subroutines.o mt19937-64.o
-	$(FTR_COMP) $(FLAGS) $^ -o $@
-
-subroutines.o: subroutines.f95 mt19937-64.o
-	$(FTR_COMP) $(FLAGS) -c $< -o $@
-
-mt19937-64.o: mt19937-64.f95
-	$(FTR_COMP) $(FLAGS) -c $^ -o $@
-
-
+$(BIN)/fortran.exe: $(SRC)/main.f95 $(OBJ)/subroutines.o $(OBJ)/mt19937-64.o
+	$(dir_guard)
+	$(FTR_COMP) $(FLAGS) -J$(OBJ) -o $@ $^
+$(OBJ)/subroutines.o: $(SRC)/subroutines.f95 $(OBJ)/mt19937-64.o
+	$(FTR_COMP) $(FLAGS) -J$(OBJ) -c $(SRC)/subroutines.f95 $(OBJ)/mt19937-64.o -o $@
+$(OBJ)/mt19937-64.o: $(FORTRAN_RAND)
+	$(dir_guard)
+	$(FTR_COMP) $(FLAGS) -J$(OBJ) -c $(FORTRAN_RAND) -o $@
 
 
-fortran.out: fortran.exe input.dat
-	/usr/bin/time -f "%e" ./$^ > $@
+$(TMP)/Fortran.out: $(BIN)/fortran.exe input.dat
+	$(dir_guard)
+	$^ > $@
 
-c.out: c.exe input.dat
-	/usr/bin/time -f "%e" ./$^ > $@
+$(TMP)/C.out: $(BIN)/c.exe input.dat
+	$(dir_guard)
+	$^ > $@
 
-cpp.out: cpp.exe input.dat
-	/usr/bin/time -f "%e" ./$^ > $@
+$(TMP)/C++.out: $(BIN)/cpp.exe input.dat
+	$(dir_guard)
+	$^ > $@
 
-python.out: main.py numba_funcs.so input.dat
-	/usr/bin/time -f "%e" $(PYTHON_PATH) main.py input.dat > $@
+$(TMP)/Python.out: $(SRC)/main.py $(SRC)/python_functions.py input.dat
+	$(dir_guard)
+	$(PYTHON_PATH) $< input.dat > $@
 
-plot: fortran.out cpp.out c.out python.out
-	$(PYTHON_PATH) plot_results.py
+$(TMP)/Numba.out: $(SRC)/main.py $(BIN)/numba_funcs.so input.dat
+	$(dir_guard)
+	$(PYTHON_PATH) $< input.dat > $@
+
+compare_simulation_results: results.png
+
+results.png: $(TMP)/Fortran.out $(TMP)/C.out $(TMP)/C++.out $(TMP)/Python.out $(TMP)/Numba.out
+	$(PYTHON_PATH) plot_results.py $^
 
 clean:
 	rm -f *.o *.mod *.exe *.so *.times *.tmp
+	rm -fr bin
 
-fortran.times: fortran.exe Ls.dat
-	echo "fortran" > $@
-	while read L; do\
+
+
+$(TMP)/Fortran.times: $(BIN)/fortran.exe Ls.dat
+	@echo "Fortran" > $@
+	@while read L; do\
 		echo -n "\r\tComputing Fortran with size $$L";\
 		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
-		(/usr/bin/time -f "%e"  ./fortran.exe $(input_file) > /dev/null ) 2>> $@;\
+		(/usr/bin/time -f "%e" $< $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	echo
+	@echo
 
-cpp.times: cpp.exe Ls.dat
-	echo "cpp" > $@
-	while read L; do\
+$(TMP)/C++.times: $(BIN)/cpp.exe Ls.dat
+	@echo "C++" > $@
+	@while read L; do\
 		echo -n "\r\tComputing C++ with size $$L";\
 		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
-		(/usr/bin/time -f "%e"  ./cpp.exe $(input_file) > /dev/null ) 2>> $@;\
+		(/usr/bin/time -f "%e" $< $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	echo
+	@echo
 
-c.times: c.exe Ls.dat
-	echo "c" > $@
-	while read L; do\
+$(TMP)/C.times: $(BIN)/c.exe Ls.dat
+	@echo "C" > $@
+	@while read L; do\
 		echo -n "\r\tComputing C with size $$L";\
 		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
-		(/usr/bin/time -f "%e"  ./c.exe $(input_file) > /dev/null ) 2>> $@;\
+		(/usr/bin/time -f "%e" $< $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	echo
+	@echo
 
-python.times: numba_funcs.so main.py Ls.dat
-	echo "python" > $@
-	while read L; do\
+$(TMP)/Python.times: $(SRC)/main.py Ls.dat
+	@echo "Python" > $@
+	@while read L; do\
 		echo -n "\r\tComputing Python with size $$L";\
 		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
-		(/usr/bin/time -f "%e"  $(PYTHON_PATH) main.py $(input_file) > /dev/null ) 2>> $@;\
+		(/usr/bin/time -f "%e"  $(PYTHON_PATH) $< $(input_file) > /dev/null ) 2>> $@;\
 	done <Ls.dat
-	echo
+	@echo
 
-Ns.times: Ls.dat
-	echo "L N" > $@
-	while read L; do\
+$(TMP)/Numba.times: $(BIN)/numba_funcs.so $(SRC)/main.py Ls.dat
+	@echo "Numba" > $@
+	@while read L; do\
+		echo -n "\r\tComputing Python with size $$L";\
+		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
+		(/usr/bin/time -f "%e"  $(PYTHON_PATH) main.py $(input_file) numba > /dev/null ) 2>> $@;\
+	done <Ls.dat
+	@echo
+
+$(TMP)/Ns.times: Ls.dat
+	@echo "L N" > $@
+	@while read L; do\
 		echo -n "$$L " >> $@;\
 		echo "$$L*$$L*$(rho)" | bc >> $@;\
 	done <Ls.dat
 
-times.dat:Ns.times fortran.times c.times cpp.times python.times
+times.dat: $(TMP)/Ns.times $(TMP)/Fortran.times $(TMP)/C.times $(TMP)/C++.times $(TMP)/Python.times $(TMP)/Numba.times
 	paste $^ | column -t > times.dat
 
 times.png: times.dat

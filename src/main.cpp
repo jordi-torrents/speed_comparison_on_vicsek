@@ -6,7 +6,7 @@
 #include <vector>
 #include <algorithm>
 
-#include "SFMT-src-1.5.1/SFMT.h"
+#include "../utils/SFMT-src-1.5.1/SFMT.h"
 
 using namespace std;
 

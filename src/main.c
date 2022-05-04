@@ -1,6 +1,6 @@
 #include <math.h>
 #include <string.h>
-#include "SFMT-src-1.5.1/SFMT.h"
+#include "../utils/SFMT-src-1.5.1/SFMT.h"
 sfmt_t sfmt;
 
 float rho, eta, v0;
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
 
     pos = malloc(2 * N * sizeof(float));
     vel = malloc(2 * N * sizeof(float));
-    near_nbr_cells malloc(N_cells * 4 * sizeof(int));
+    near_nbr_cells = malloc(N_cells * 4 * sizeof(int));
 
     randomize_system();
     set_geometry();

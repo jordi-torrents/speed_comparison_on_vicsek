@@ -6,3 +6,7 @@
 *.tmp
 *.so
 *.times
+bin
+obj
+tmp
+*.pyc
