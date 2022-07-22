@@ -16,7 +16,7 @@ input_file="input_file.tmp"
 v0=0.03
 rho=1.0
 N_reset=1000
-N_steps=1000
+N_steps=500
 seed=1234
 
 
@@ -30,7 +30,7 @@ all: $(BIN)/c.exe $(BIN)/fortran.exe $(BIN)/cpp.exe $(BIN)/numba_funcs.so
 run_cpp: cpp.out
 run_c: c.out
 run_fortran: fortran.out
-run_python: python.out
+run_python: $(TMP)/Python.times
 
 
 $(BIN)/numba_funcs.so: $(SRC)/numba_functions.py
@@ -83,8 +83,7 @@ results.png: $(TMP)/Fortran.out $(TMP)/C.out $(TMP)/C++.out $(TMP)/Python.out $(
 	$(PYTHON_PATH) plot_results.py $^
 
 clean:
-	rm -f *.o *.mod *.exe *.so *.times *.tmp
-	rm -fr bin
+	rm -fr bin tmp bin obj
 
 
 
@@ -120,20 +119,21 @@ $(TMP)/Python.times: $(SRC)/main.py Ls.dat
 	@while read L; do\
 		echo -n "\r\tComputing Python with size $$L";\
 		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
-		(/usr/bin/time -f "%e"  $(PYTHON_PATH) $< $(input_file) > /dev/null ) 2>> $@;\
+		timeout 10s bash -c "(/usr/bin/time -f "%e"  $(PYTHON_PATH) $< $(input_file) > /dev/null ) 2>> $@" || echo nan >> $@;\
 	done <Ls.dat
 	@echo
 
-$(TMP)/Numba.times: $(BIN)/numba_funcs.so $(SRC)/main.py Ls.dat
+$(TMP)/Numba.times: $(SRC)/main.py $(BIN)/numba_funcs.so  Ls.dat
 	@echo "Numba" > $@
 	@while read L; do\
-		echo -n "\r\tComputing Python with size $$L";\
+		echo -n "\r\tComputing Numba size $$L";\
 		echo "$$L L\n$(v0) v0\n$(rho) rho\n$(N_reset) N_reset\n$(N_steps) N_steps\n$(seed) seed" > $(input_file);\
-		(/usr/bin/time -f "%e"  $(PYTHON_PATH) main.py $(input_file) numba > /dev/null ) 2>> $@;\
+		timeout 10s bash -c "(/usr/bin/time -f "%e"  $(PYTHON_PATH) $< $(input_file) numba > /dev/null ) 2>> $@" || echo nan >> $@;\
 	done <Ls.dat
 	@echo
 
 $(TMP)/Ns.times: Ls.dat
+	$(dir_guard)
 	@echo "L N" > $@
 	@while read L; do\
 		echo -n "$$L " >> $@;\

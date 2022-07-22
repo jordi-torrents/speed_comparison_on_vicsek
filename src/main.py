@@ -5,7 +5,7 @@ import sys
 if len(sys.argv) >= 3:
     if sys.argv[2] == "numba":
         sys.path.append("bin")
-        import numba_funcs as funcs
+        import numba_functions as funcs
     else:
         import python_functions as funcs
 else:
